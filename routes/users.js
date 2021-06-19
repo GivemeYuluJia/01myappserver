@@ -1,5 +1,5 @@
 var express = require('express');
-var userController = require('../controllers/users')
+var userController = require('../controllers/users');
 var router = express.Router();
 
 /* GET users listing. */

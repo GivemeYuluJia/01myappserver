@@ -7,7 +7,9 @@ var UserSchema = new mongoose.Schema({
     username : {type: String, required: true, index: {unique: true}},
     password : {type: String, required: true},
     email : {type: String, required: true, index: {unique: true}},
-    data : {type: Date, default: Date.now()}
+    date : {type: Date, default: Date.now()},
+    isAdmin: {type: Boolean, default: false},
+    isFreeze: {type: Boolean, default:false}
 });
 //  与users集合关联
 var UserModel = mongoose.model('user',UserSchema);
@@ -36,11 +38,27 @@ var findPassword = (username, password)=>{
     .catch(()=>{
         return false
     })
-}
+};
+
+var updateFreeze = (username, isFreeze) => {
+    return UserModel.update({username},{ $set: { isFreeze } })
+    .then(()=>{
+        return true
+    })
+    .catch(()=>{
+        return false
+    })
+};
+
+var usersList = () => {
+    return UserModel.find();
+};
 
 module.exports = {
     save,
     findLogin,
-    findPassword
+    findPassword,
+    usersList,
+    updateFreeze
 }
 

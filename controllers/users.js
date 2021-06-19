@@ -9,6 +9,7 @@ var login = async (req, res, next) =>{
     });
     if(result){
         req.session.username = username;
+        req.session.isAdmin = result.isAdmin;
         res.send({
             msg: '登陆成功',
             status: 0
@@ -82,7 +83,8 @@ var getUser = async (req, res, next) =>{
 			msg: '获取用户信息成功',
 			status: 0,
 			data: {
-				username: req.session.username
+				username: req.session.username,
+                isAdmin: req.session.isAdmin
 			}
 		});
 	}else{
@@ -94,7 +96,10 @@ var getUser = async (req, res, next) =>{
 };
 var findPassword = async (req, res, next) =>{
     var { email, username, password, newpassword} = req.body;
-    var result = await UserModel.findPassword(username, newpassword);
+    var result1 = await UserModel.findLogin({
+        username,
+        password
+    });
     //用户名或邮箱其中一个为空
     if(!username || !email){
         res.send({
@@ -118,23 +123,32 @@ var findPassword = async (req, res, next) =>{
         });
         return;
     }
-    if(result){
-        req.session.password = password
-        req.session.newpassword = newpassword
-        res.send({
-            msg: '密码修改成功',
-            status: 0,
-            data:{
-                password: req.session.password,
-                newpassword: req.session.newpassword
-            }
-        });
+    if(result1){
+        var result = await UserModel.findPassword(username, newpassword);
+        if(result){
+            // req.session.password = password
+            // req.session.newpassword = newpassword
+            res.send({
+                msg: '密码修改成功',
+                status: 0
+                // data:{
+                //     password: req.session.password,
+                //     newpassword: req.session.newpassword
+                // }
+            });
+        }else{
+            res.send({
+                msg: '密码修改失败',
+                status: -1
+            });
+        }
     }else{
         res.send({
-            msg: '密码修改失败',
-            status: -1
+            msg: '密码错误',
+            status: -2
         });
     }
+    
 };
 
 module.exports = {
