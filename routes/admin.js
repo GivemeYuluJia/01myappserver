@@ -17,5 +17,5 @@ router.use((req, res, next) => {
 router.get('/', adminController.index);
 router.get('/usersList',adminController.usersList)
 router.post('/updateFreeze',adminController.updateFreeze)
-
+router.post('/deleteUser',adminController.deleteUser);
 module.exports = router;

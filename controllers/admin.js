@@ -39,10 +39,27 @@ var updateFreeze = async(req, res, next) => {
             status: -1
         }) 
     }
-}
+};
+
+var deleteUser = async(req, res, next) => {
+    var {username} = req.body;
+    var result = await UserModel.deleteUser(username);
+    if(result){
+        res.send({
+			msg: '删除用户信息成功',
+			status: 0
+		});
+    }else{
+        res.send({
+			msg: '删除用户信息失败',
+			status: -1
+		});
+    }
+};
 
 module.exports = {
     index,
     usersList,
-    updateFreeze
+    updateFreeze,
+    deleteUser
 }

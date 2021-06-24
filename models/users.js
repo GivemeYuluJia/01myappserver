@@ -1,6 +1,8 @@
 var  mongoose = require('mongoose');
 //index生效,添加index索引
 mongoose.set('useCreateIndex',true);
+var {Head} = require('../untils/config')
+var url = require('url')
 
 //  定义了一个新的模型，但是此模式还未和users集合有关联
 var UserSchema = new mongoose.Schema({
@@ -9,7 +11,8 @@ var UserSchema = new mongoose.Schema({
     email : {type: String, required: true, index: {unique: true}},
     date : {type: Date, default: Date.now()},
     isAdmin: {type: Boolean, default: false},
-    isFreeze: {type: Boolean, default:false}
+    isFreeze: {type: Boolean, default:false},
+    userHead: {type: String, default: url.resolve(Head.baseUrl, '1.jpg')}
 });
 //  与users集合关联
 var UserModel = mongoose.model('user',UserSchema);
@@ -54,11 +57,27 @@ var usersList = () => {
     return UserModel.find();
 };
 
+var deleteUser = (username)  => {
+    return UserModel.deleteOne({username});
+};
+
+var updateUserHead = (username,userHead) => {
+    return UserModel.update({username}, { $set: { userHead } })
+            .then(()=>{
+                return true;
+            })
+            .catch(()=>{
+                return false;
+            })
+}
+
 module.exports = {
     save,
     findLogin,
     findPassword,
     usersList,
-    updateFreeze
+    updateFreeze,
+    deleteUser,
+    updateUserHead
 }
 

@@ -1,19 +1,55 @@
-var UserModel = require('../models/users')
-
+var UserModel = require('../models/users');
+const { Email,Head } = require('../untils/config');
+var { setCrypto,createVerify } = require('../untils/base');
+//用于重命名
+var fs = require('fs');
+var url = require('url');
 //node大部分都是异步，简化异步回调用async和await
 var login = async (req, res, next) =>{
-    var {username, password} = req.body;
+    var {username, password, verifyImg} = req.body;
+    if(verifyImg !== req.session.verifyImg){
+        res.send({
+            msg: '验证码输入错误',
+            status: -5,
+            data: {
+                verify:req.session.verifyImg
+            }
+        });
+        return;
+    }
     var result = await UserModel.findLogin({
         username,
-        password
+        password: setCrypto(password)
     });
+    if(!username){
+        res.send({
+            msg: '用户名未输入',
+            status: -4
+        });
+        return;
+    }
+    if(!password){
+        res.send({
+            msg: '密码未输入',
+            status: -3
+        });
+        return;
+    }
     if(result){
         req.session.username = username;
         req.session.isAdmin = result.isAdmin;
-        res.send({
+        req.session.userHead = result.userHead;
+        if(result.isFreeze){
+            res.send({
+                msg: '账户被冻结',
+                status: -2
+            });
+        }else{
+            res.send({
             msg: '登陆成功',
             status: 0
         });
+        }
     }else{
         res.send({
             msg: '登录失败',
@@ -22,12 +58,33 @@ var login = async (req, res, next) =>{
     }
 };
 var register = async (req, res, next) =>{
-    var {username, password, repassword, email} = req.body;
+    var {username, password, repassword, email, verify} = req.body;
     //用户名或邮箱其中一个为空
     if(!username || !email){
         res.send({
             msg: '用户名或邮箱未输入',
             status: -5
+        });
+        return;
+    }
+    if(!verify){
+        res.send({
+            msg: '验证码为空',
+            status: -6
+        });
+        return;
+    }
+    if(email != req.session.email || verify != req.session.verify){
+        res.send({
+            msg: '验证码错误',
+            status: -1
+        });
+        return;
+    }
+    if((Email.time - req.session.time)/1000 > 60){
+        res.send({
+            msg: '验证码已过期',
+            status: -7
         });
         return;
     }
@@ -50,7 +107,7 @@ var register = async (req, res, next) =>{
 
     var result = await UserModel.save({
 		username,
-		password,
+		password: setCrypto(password),
         email
 	});
     if(result){
@@ -67,7 +124,52 @@ var register = async (req, res, next) =>{
     }
 };
 var verify = async (req, res, next) =>{
+    var email = req.query.email;
+    var verify = Email.verify;
+    req.session.verify = verify;
+	req.session.email = email;
+    req.session.time = Email.time;
+    // Email.transporter.sendMail({
+    //     from: 'YY网 550992963@qq.com', // sender address
+    //     to: email, // list of receivers
+    //     subject: "YY网邮箱验证码", // Subject line
+    //     text: '验证码' + verify // plain text body
+    //   },(err)=>{
+    //     if(err){
+    //         res.send({
+    //             msg: '验证码发送失败',
+    //             status: -1
+    //         })
+    //     }else{
+    //         res.send({
+    //             msg: '验证码发送成功',
+    //             status: 0
+    //         })
+    //     }
+    // });
+    var mailOptions = {
+	    from: 'YY网 550992963@qq.com',
+	    to: email,
+	    subject: 'YY网邮箱验证码',
+	    text: '验证码：' + verify
+	}
 
+	Email.transporter.sendMail(mailOptions,(err)=>{
+		
+		if(err){
+			res.send({
+				msg : '验证码发送失败',
+				status : -1
+			});
+		}
+		else{
+			res.send({
+				msg : '验证码发送成功',
+				status : 0
+			});
+		}
+
+	});
 };
 var loginout = async (req, res, next) =>{
     req.session.username = '';
@@ -84,7 +186,8 @@ var getUser = async (req, res, next) =>{
 			status: 0,
 			data: {
 				username: req.session.username,
-                isAdmin: req.session.isAdmin
+                isAdmin: req.session.isAdmin,
+                userHead: req.session.userHead
 			}
 		});
 	}else{
@@ -95,10 +198,10 @@ var getUser = async (req, res, next) =>{
 	}
 };
 var findPassword = async (req, res, next) =>{
-    var { email, username, password, newpassword} = req.body;
+    var { email, username, password, newpassword, verify} = req.body;
     var result1 = await UserModel.findLogin({
         username,
-        password
+        password: setCrypto(password)
     });
     //用户名或邮箱其中一个为空
     if(!username || !email){
@@ -123,8 +226,15 @@ var findPassword = async (req, res, next) =>{
         });
         return;
     }
+    if(email != req.session.email || verify != req.session.verify){
+        res.send({
+            msg: '验证码错误',
+            status: -6
+        });
+        return;
+    }
     if(result1){
-        var result = await UserModel.findPassword(username, newpassword);
+        var result = await UserModel.findPassword(username, setCrypto(newpassword));
         if(result){
             // req.session.password = password
             // req.session.newpassword = newpassword
@@ -151,11 +261,41 @@ var findPassword = async (req, res, next) =>{
     
 };
 
+var verifyImg = async(req, res, next) =>{
+    var result = await createVerify(req,res);
+    if(result){
+        req.session.verifyImg = result.token;
+        res.send(result.buffer);
+    }
+};
+
+var uploadUserHead = async(req, res, next) => {
+    console.log(req.file)
+    await fs.renameSync( 'public/uploads/' + req.file.filename , 'public/uploads/' + req.session.username + '.jpg' );
+    var result = await UserModel.updateUserHead(req.session.username, url.resolve(Head.baseUrl , req.session.username + '.jpg'))
+    if(result){
+        res.send({
+            msg: '头像修改成功',
+            status: 0,
+            data: {
+                userHead: url.resolve(Head.baseUrl,req.session.username + '.jpg')
+            }
+        })
+    }else{
+        res.send({
+            msg: '头像修改失败',
+            status: -1
+        })
+    }
+}
+
 module.exports = {
     login,
     register,
     verify,
     loginout,
     getUser,
-    findPassword
+    findPassword,
+    verifyImg,
+    uploadUserHead
 }

@@ -2,6 +2,9 @@ var express = require('express');
 var userController = require('../controllers/users');
 var router = express.Router();
 
+var multer = require('multer')
+var upload = multer({dest: 'public/uploads/'})
+
 /* GET users listing. */
 router.get('/', function(req, res, next) {
   res.send('respond with a resource');
@@ -18,4 +21,9 @@ router.get('/loginout', userController.loginout);
 router.get('/getUser', userController.getUser);
 //找回密码接口
 router.post('/findPassword', userController.findPassword);
+//图形验证码
+router.get('/verifyImg',userController.verifyImg)
+//头像上传
+router.post('/uploadUserHead', upload.single('file'), userController.uploadUserHead)
+
 module.exports = router;
